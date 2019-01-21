@@ -290,6 +290,19 @@ impl<I: Interface + 'static> NewProxy<I> {
         }
     }
 
+    /// Implement this proxy using the given handler.
+    pub fn implement_handler<H>(self, handler: H) -> Proxy<I>
+    where
+        H: Send + Sync + 'static,
+        I: HandledBy<H>,
+        I::Event: MessageGroup<Map = ProxyMap>,
+    {
+        self.implement(|event, proxy| {
+            let handler = proxy.user_data::<H>().unwrap();
+            I::handle(handler, event, proxy.clone())
+        }, handler)
+    }
+
     /// Implement this proxy using given function and implementation data.
     ///
     /// This method allows the implementation to not be `Send`, but requires for
@@ -358,4 +371,12 @@ impl<I: Interface + 'static> NewProxy<I> {
             inner: NewProxyInner::from_c_ptr(ptr),
         }
     }
+}
+
+/// Provides a callback function to handle events of the implementing interface via `T`.
+///
+/// This trait is meant to be implemented automatically by code generated with `wayland-scanner`.
+pub trait HandledBy<T>: Interface + Sized {
+    /// Handles an event.
+    fn handle(handler: &T, event: Self::Event, proxy: Proxy<Self>);
 }
