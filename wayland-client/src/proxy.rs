@@ -290,6 +290,18 @@ impl<I: Interface + 'static> NewProxy<I> {
         }
     }
 
+    /// Implement this proxy using the given handler.
+    pub fn implement_handler<H>(self, handler: H) -> Proxy<I>
+    where
+        H: Handler<I> + Send + Sync + 'static,
+        I::Event: MessageGroup<Map = ProxyMap>,
+    {
+        self.implement(|event, proxy| {
+            let handler = proxy.user_data::<H>().unwrap();
+            handler.handle(event, proxy.clone())
+        }, handler)
+    }
+
     /// Implement this proxy using given function and implementation data.
     ///
     /// This method allows the implementation to not be `Send`, but requires for
@@ -358,4 +370,10 @@ impl<I: Interface + 'static> NewProxy<I> {
             inner: NewProxyInner::from_c_ptr(ptr),
         }
     }
+}
+
+/// Provides a callback function to handle events of the `I` interface.
+pub trait Handler<I: Interface> {
+    /// Handles an event.
+    fn handle(&self, event: I::Event, proxy: Proxy<I>);
 }
